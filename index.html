@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-TL">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WEB GIS Habitasaun Timor-Leste – DGHC</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <!-- Leaflet Routing Machine CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+  <!-- ════════════════════════ SIDEBAR ════════════════════════ -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-house-chimney"></i></div>
+      <div class="logo-text">
+        <span class="logo-title">DGHC</span>
+        <span class="logo-sub">Habitasaun TL</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-view="dashboard"><i class="fa-solid fa-chart-pie"></i><span>Dashboard</span></a>
+      <a href="#" class="nav-item" data-view="mapa"><i class="fa-solid fa-map-location-dot"></i><span>Mapa</span></a>
+      <a href="#" class="nav-item" data-view="kadastre"><i class="fa-solid fa-table-list"></i><span>Kadastér Uma</span></a>
+      <a href="#" class="nav-item" data-view="galeria"><i class="fa-solid fa-images"></i><span>Galeria Foto</span></a>
+      <a href="#" class="nav-item" data-view="relatorio"><i class="fa-solid fa-chart-bar"></i><span>Relatóriu</span></a>
+      <a href="#" class="nav-item" data-view="sobre"><i class="fa-solid fa-circle-info"></i><span>Sobre</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <span>© 2025 DGHC</span><br />
+      <span class="text-xs">Rep. Dem. Timor-Leste</span>
+    </div>
+  </aside>
+
+  <!-- ════════════════════════ MAIN CONTENT ════════════════════════ -->
+  <div id="main-wrapper" class="main-wrapper">
+
+    <!-- TOP NAV -->
+    <header class="topnav">
+      <button id="sidebar-toggle" class="hamburger-btn" title="Toggle Sidebar">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <div class="topnav-title">
+        <span class="topnav-main">WEB GIS Habitasaun Timor-Leste</span>
+        <span class="topnav-sub">Sistema Informação Geografika Habitasaun Komunitária Timor-Leste</span>
+      </div>
+      <div class="topnav-actions">
+        <label class="import-btn" title="Import Excel" for="excel-input">
+          <i class="fa-solid fa-file-import"></i> Import Excel
+        </label>
+        <input type="file" id="excel-input" accept=".xlsx,.xls,.csv" class="hidden" />
+        <button id="btn-my-location" class="location-btn" title="Lokasi Saya">
+          <i class="fa-solid fa-location-crosshairs"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- NOTIFICATION BAR -->
+    <div id="notification-bar" class="notification-bar hidden"></div>
+
+    <!-- ════ VIEW: DASHBOARD ════ -->
+    <section id="view-dashboard" class="view active">
+
+      <!-- KPI CARDS -->
+      <div class="kpi-grid">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-icon"><i class="fa-solid fa-house"></i></div>
+          <div class="kpi-info">
+            <div class="kpi-label">Total Uma</div>
+            <div class="kpi-value" id="kpi-total">—</div>
+          </div>
+        </div>
+        <div class="kpi-card kpi-green">
+          <div class="kpi-icon"><i class="fa-solid fa-house-circle-check"></i></div>
+          <div class="kpi-info">
+            <div class="kpi-label">Uma Dignu</div>
+            <div class="kpi-value" id="kpi-dignu">—</div>
+          </div>
+        </div>
+        <div class="kpi-card kpi-yellow">
+          <div class="kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="kpi-info">
+            <div class="kpi-label">Vulnerable</div>
+            <div class="kpi-value" id="kpi-vulnerable">—</div>
+          </div>
+        </div>
+        <div class="kpi-card kpi-purple">
+          <div class="kpi-icon"><i class="fa-solid fa-location-dot"></i></div>
+          <div class="kpi-info">
+            <div class="kpi-label">Munisípiu</div>
+            <div class="kpi-value" id="kpi-municipality">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FILTER BAR -->
+      <div class="filter-card">
+        <div class="filter-header">
+          <i class="fa-solid fa-filter"></i> Filter Data
+          <button id="btn-reset-filter" class="reset-filter-btn"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+        </div>
+        <div class="filter-grid">
+          <div class="filter-group">
+            <label>Munisípiu</label>
+            <select id="filter-municipality"><option value="">Hotu-hotu</option></select>
+          </div>
+          <div class="filter-group">
+            <label>Postu Administrativu</label>
+            <select id="filter-post"><option value="">Hotu-hotu</option></select>
+          </div>
+          <div class="filter-group">
+            <label>Suco</label>
+            <select id="filter-suco"><option value="">Hotu-hotu</option></select>
+          </div>
+          <div class="filter-group">
+            <label>Aldeia</label>
+            <select id="filter-aldeia"><option value="">Hotu-hotu</option></select>
+          </div>
+          <div class="filter-group">
+            <label>Status</label>
+            <select id="filter-status"><option value="">Hotu-hotu</option></select>
+          </div>
+          <div class="filter-group">
+            <label>Programa</label>
+            <select id="filter-program"><option value="">Hotu-hotu</option></select>
+          </div>
+          <div class="filter-group">
+            <label>Tinan (Tahun)</label>
+            <select id="filter-year"><option value="">Hotu-hotu</option></select>
+          </div>
+          <div class="filter-group search-group">
+            <label>Buka Uma (Search)</label>
+            <div class="search-wrapper">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="search-input" placeholder="ID / Suco / Aldeia / Munisípiu..." />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAP -->
+      <div class="map-card">
+        <div class="map-card-header">
+          <i class="fa-solid fa-map"></i> Mapa Habitasaun Timor-Leste
+          <div class="map-card-actions">
+            <button id="btn-clear-route" class="map-action-btn hidden" title="Clear Route">
+              <i class="fa-solid fa-route"></i> Clear Route
+            </button>
+          </div>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <!-- CHARTS -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title"><i class="fa-solid fa-chart-bar"></i> Uma ba Munisípiu</div>
+          <canvas id="chart-municipality"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><i class="fa-solid fa-chart-pie"></i> Status Uma</div>
+          <canvas id="chart-status"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ════ VIEW: MAPA STANDALONE ════ -->
+    <!-- Redirects to dashboard map via JS -->
+    <section id="view-mapa" class="view" style="display:none!important"></section>
+
+    <!-- ════ VIEW: KADASTRE UMA ════ -->
+    <section id="view-kadastre" class="view">
+      <div class="table-card">
+        <div class="table-header">
+          <span><i class="fa-solid fa-table-list"></i> Kadastér Uma — Database Rumah</span>
+          <div class="table-search-wrapper">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="table-search" placeholder="Buka iha tabela..." />
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table id="data-table">
+            <thead>
+              <tr>
+                <th data-col="no">No</th>
+                <th data-col="id">ID Uma</th>
+                <th data-col="municipality">Munisípiu</th>
+                <th data-col="post">Postu</th>
+                <th data-col="suco">Suco</th>
+                <th data-col="aldeia">Aldeia</th>
+                <th data-col="status">Status</th>
+                <th data-col="lat">Latitude</th>
+                <th data-col="lng">Longitude</th>
+                <th>Foto</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div class="pagination-bar" id="pagination-bar"></div>
+      </div>
+    </section>
+
+    <!-- ════ VIEW: GALERIA ════ -->
+    <section id="view-galeria" class="view">
+      <div class="galeria-card">
+        <div class="galeria-header"><i class="fa-solid fa-images"></i> Galeria Foto Uma</div>
+        <div id="galeria-grid" class="galeria-grid"></div>
+      </div>
+    </section>
+
+    <!-- ════ VIEW: RELATORIO ════ -->
+    <section id="view-relatorio" class="view">
+      <div class="relatorio-card">
+        <div class="relatorio-header"><i class="fa-solid fa-chart-bar"></i> Relatóriu Estatístika Habitasaun</div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-title">Uma ba Munisípiu</div><canvas id="chart-r-municipality"></canvas></div>
+          <div class="chart-card"><div class="chart-title">Status Uma</div><canvas id="chart-r-status"></canvas></div>
+          <div class="chart-card"><div class="chart-title">Uma ba Programa</div><canvas id="chart-r-program"></canvas></div>
+          <div class="chart-card"><div class="chart-title">Uma ba Tinan</div><canvas id="chart-r-year"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ VIEW: SOBRE ════ -->
+    <section id="view-sobre" class="view">
+      <div class="sobre-card">
+        <h2><i class="fa-solid fa-circle-info"></i> Kona-Ba Aplikasaun</h2>
+        <p><strong>WEB GIS Habitasaun Timor-Leste</strong> mak sistema informasaun geografika ne'ebé dezenvolve ba DGHC (Direção-Geral Habitação Comunitária) hodi halo jestaun dadus uma-kain iha Repúblika Demokrátika Timor-Leste.</p>
+        <ul>
+          <li>Vizualiza lokasaun uma iha mapa Timor-Leste</li>
+          <li>Lee koordinat husi ficheiru Excel</li>
+          <li>Hatudu foto uma tuir lokasaun/ID</li>
+          <li>Informasaun detallu uma wainhira klik marker</li>
+          <li>Estatístika nasionál no por rejiaun</li>
+          <li>Buka no filtra dadus</li>
+          <li>Nabegasaun (rota) ba lokasaun uma ne'ebé hili ona</li>
+        </ul>
+        <h3>Teknolojia</h3>
+        <p>HTML5 · CSS3 · JavaScript · Leaflet.js · OpenStreetMap · SheetJS · Chart.js · Tailwind CSS</p>
+        <h3>Fontes Dadus</h3>
+        <p>Coordinate_Uma.xlsx · Pasta <code>images/</code></p>
+        <p class="sobre-footer">Map data © OpenStreetMap contributors</p>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <span>© DGHC – Direção-Geral Habitação Comunitária · República Democrática de Timor-Leste</span>
+      <span class="footer-sep">|</span>
+      <span>Web GIS Habitasaun Timor-Leste</span>
+      <span class="footer-sep">|</span>
+      <span>Map data © OpenStreetMap contributors</span>
+    </footer>
+
+  </div><!-- /main-wrapper -->
+
+  <!-- ════════════════════════ MODAL DETAIL ════════════════════════ -->
+  <div id="modal-detail" class="modal-overlay hidden">
+    <div class="modal-box">
+      <button class="modal-close" id="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+      <div class="modal-body" id="modal-body-content"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════ LOADING OVERLAY ════════════════════════ -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-box">
+      <div class="loading-spinner"></div>
+      <div id="loading-message" class="loading-msg">Karga dadus...</div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
