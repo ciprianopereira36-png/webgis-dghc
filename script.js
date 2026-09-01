@@ -4,6 +4,8 @@
    Versão 1.0 – 2025
    ================================================================ */
 
+const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT_ARyv6m54Gilboq9bxTTmj6YmEacoTUXgQfEQOg7ezeMFWOFIHLe5wfctUYwDtg/pub?gid=580851566&single=true&output=csv';
+
 /* ─────────────────────────────────────────────────────────────────
    COLUMN MAPPING CONFIGURATION
    Sesuaikan nama kolom Excel di sini jika struktur berbeda.
@@ -73,7 +75,6 @@ function detectCol(headers, mapKey) {
 
 function parseDMS(dmsStr) {
   if (dmsStr == null) return NaN;
-  // Handle koma menjadi titik desimal
   const s = String(dmsStr).trim().replace(',', '.');
   
   const dec = parseFloat(s);
@@ -205,7 +206,7 @@ function initMap() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   EXCEL READER
+   EXCEL & GOOGLE SHEETS READER
 ═══════════════════════════════════════════════════════════════ */
 function readExcel(file) {
   return new Promise((resolve, reject) => {
@@ -229,26 +230,24 @@ function readExcel(file) {
 
 async function readDefaultExcel() {
   try {
-    showLoading('Mbaca ficheiru Excel...');
-    const resp = await fetch('data/Coordinate_Uma.xlsx');
-    if (!resp.ok) throw new Error('File not found');
-    const buf = await resp.arrayBuffer();
-    const data = new Uint8Array(buf);
-    const wb = XLSX.read(data, { type: 'array' });
-    const sheetName = wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
+    showLoading('Karga dadus husi Google Sheets...');
+    const resp = await fetch(GOOGLE_SHEET_CSV_URL);
+    if (!resp.ok) throw new Error('Gagal mengambil data Google Sheet');
+    
+    const csvText = await resp.text();
+    const wb = XLSX.read(csvText, { type: 'string' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
     return XLSX.utils.sheet_to_json(ws, { defval: '' });
   } catch (err) {
+    console.warn('Google Sheet gagal dimuat, mencoba cadangan lokal...', err);
     try {
-      const resp2 = await fetch('Coordinate_Uma.xlsx');
-      if (!resp2.ok) throw new Error('Not found at root either');
-      const buf2 = await resp2.arrayBuffer();
-      const data2 = new Uint8Array(buf2);
-      const wb2 = XLSX.read(data2, { type: 'array' });
-      const ws2 = wb2.Sheets[wb2.SheetNames[0]];
-      return XLSX.utils.sheet_to_json(ws2, { defval: '' });
+      const resp2 = await fetch('data/Coordinate_Uma.xlsx');
+      if (!resp2.ok) throw new Error('File cadangan lokal tidak ditemukan');
+      const buf = await resp2.arrayBuffer();
+      const wb2 = XLSX.read(new Uint8Array(buf), { type: 'array' });
+      return XLSX.utils.sheet_to_json(wb2.Sheets[wb2.SheetNames[0]], { defval: '' });
     } catch (err2) {
-      console.warn('Default Excel not found, waiting for user upload.', err2);
+      console.error('Semua sumber data gagal dimuat.', err2);
       return null;
     }
   }
@@ -297,7 +296,6 @@ function processRawRows(rows) {
 
     const id = colId ? (row[colId] ?? (idx + 1)) : (idx + 1);
     
-    // Prioritaskan nama file dari kolom FOTO jika tersedia
     let photoList;
     if (colPhoto && row[colPhoto] && String(row[colPhoto]).trim() !== '') {
       const customImg = String(row[colPhoto]).trim();
@@ -1121,13 +1119,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Escape') closeModal();
   });
 
-  showLoading('Karga dadus Excel default...');
+  showLoading('Karga dadus...');
   const rows = await readDefaultExcel();
   if (rows) {
     await loadData(rows);
   } else {
     hideLoading();
-    showNotif('ℹ Klik "Import Excel" hodi karga ficheiru Coordinate_Uma.xlsx.', 'info', 10000);
+    showNotif('ℹ Dadus la bele hetan husi Google Sheets ka ficheiru lokal.', 'warning', 8000);
     updateKPI([]);
     renderCharts([]);
     renderTable([]);
