@@ -7,31 +7,27 @@
 /* ─────────────────────────────────────────────────────────────────
    COLUMN MAPPING CONFIGURATION
    Sesuaikan nama kolom Excel di sini jika struktur berbeda.
-   Masukkan semua kemungkinan nama kolom (case-insensitive).
 ───────────────────────────────────────────────────────────────── */
 const COLUMN_MAP = {
-  id:             ['nu uma', 'id', 'id_uma', 'house_id', 'no', 'nomor', 'no uma', 'id uma'],
-  latitude:       ['latitude', 'lat', 'y', 'lintang'],
-  longitude:      ['longitude', 'long', 'lon', 'x', 'bujur'],
-  municipality:   ['municipality', 'munisipiu', 'municipio', 'kabupaten', 'munisípiu'],
-  post:           ['administrative post', 'postu administrativu', 'postu', 'kecamatan', 'admin post'],
-  suco:           ['suco', 'suku', 'desa', 'kelurahan'],
-  aldeia:         ['aldeia', 'dusun', 'kampung', 'lingkungan'],
-  status:         ['status', 'kondisi', 'kategori'],
-  program:        ['program', 'programa', 'projetu'],
-  year:           ['year', 'tinan', 'tahun', 'ano'],
+  id:           ['id_uma', 'nu uma', 'id', 'house_id', 'no', 'nomor', 'no uma', 'id uma'],
+  latitude:     ['latitude', 'lat', 'y', 'lintang'],
+  longitude:    ['longitude', 'long', 'lon', 'x', 'bujur'],
+  municipality: ['munisipiu', 'municipality', 'municipio', 'kabupaten', 'munisípiu'],
+  post:         ['postu', 'administrative post', 'postu administrativu', 'kecamatan', 'admin post'],
+  suco:         ['suco', 'suku', 'desa', 'kelurahan'],
+  aldeia:       ['aldeia', 'dusun', 'kampung', 'lingkungan'],
+  status:       ['status', 'kondisi', 'kategori'],
+  program:      ['programa', 'program', 'projetu'],
+  year:         ['tinan', 'year', 'tahun', 'ano'],
+  photo:        ['foto', 'photo', 'image', 'gambar'],
 };
 
 /* ─────────────────────────────────────────────────────────────────
    IMAGE PATH CONFIGURATION
-   Sesuaikan folder foto jika berbeda.
 ───────────────────────────────────────────────────────────────── */
 const IMAGE_CONFIG = {
-  // Folder foto. Gunakan '' (kosong) jika foto di root.
   folder: 'images',
-  // Ekstensi yang dicoba secara berurutan
   extensions: ['jpg', 'jpeg', 'png', 'webp'],
-  // Padding ID (mis: 1 → '01')
   padLength: 2,
 };
 
@@ -39,14 +35,14 @@ const IMAGE_CONFIG = {
    APLIKASI STATE
 ═══════════════════════════════════════════════════════════════ */
 const APP = {
-  allData:      [],   // semua data dari Excel
-  filtered:     [],   // data setelah filter
-  map:          null, // instance Leaflet
-  clusterGroup: null, // MarkerClusterGroup
-  markers:      {},   // { id: marker }
-  charts:       {},   // instance Chart.js
-  userMarker:   null, // marker lokasi pengguna
-  routeControl: null, // instance routing
+  allData:      [],
+  filtered:     [],
+  map:          null,
+  clusterGroup: null,
+  markers:      {},
+  charts:       {},
+  userMarker:   null,
+  routeControl: null,
   currentView:  'dashboard',
   pagination: { page: 1, perPage: 15 },
   sort:       { col: 'no', dir: 'asc' },
@@ -65,7 +61,6 @@ function escAttr(str) {
   return String(str ?? '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 }
 
-/** Detect column by COLUMN_MAP key */
 function detectCol(headers, mapKey) {
   const names = COLUMN_MAP[mapKey];
   const lc = headers.map(h => String(h).toLowerCase().trim());
@@ -76,15 +71,14 @@ function detectCol(headers, mapKey) {
   return null;
 }
 
-/** Parse DMS string like "  9° 3'5.45\"S" → -9.051514 */
 function parseDMS(dmsStr) {
   if (dmsStr == null) return NaN;
-  const s = String(dmsStr).trim();
-  // Try decimal first
+  // Handle koma menjadi titik desimal
+  const s = String(dmsStr).trim().replace(',', '.');
+  
   const dec = parseFloat(s);
   if (!isNaN(dec) && !s.includes('°')) return dec;
 
-  // DMS pattern: deg° min' sec"[NSEW]  or  -deg min sec
   const m = s.match(/(\d+)[°\s]\s*(\d+)['']\s*([\d.]+)[""]?\s*([NSEWnsew]?)/);
   if (m) {
     let deg = parseFloat(m[1]);
@@ -95,7 +89,7 @@ function parseDMS(dmsStr) {
     if (dir === 'S' || dir === 'W') dd = -dd;
     return dd;
   }
-  // Try plain number with direction suffix: "-9.051"
+  
   const m2 = s.match(/([-\d.]+)\s*([NSEWnsew]?)/);
   if (m2) {
     let dd = parseFloat(m2[1]);
@@ -105,16 +99,13 @@ function parseDMS(dmsStr) {
   return NaN;
 }
 
-/** Validate coordinate for Timor-Leste region (warning, not hard block) */
 function validateCoord(lat, lng) {
   if (isNaN(lat) || isNaN(lng)) return 'invalid';
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return 'out_of_range';
-  // TL warning zone
   if (lat < -11 || lat > -7 || lng < 123 || lng > 128) return 'outside_tl';
   return 'ok';
 }
 
-/** Build image path candidates for a given ID */
 function getImagePath(id) {
   if (id == null) return null;
   const idStr = String(id).trim();
@@ -128,28 +119,28 @@ function getImagePath(id) {
   return candidates;
 }
 
-/** Return CSS status class */
 function statusClass(status) {
   if (!status) return 'status-other';
   const s = String(status).toLowerCase();
   if (s.includes('dignu') || s.includes('layak')) return 'status-dignu';
   if (s.includes('vulnerable') || s.includes('rentan')) return 'status-vulnerable';
-  if (s.includes('interven') || s.includes('butuh')) return 'status-intervensi';
+  if (s.includes('interven') || s.includes('reabilita') || s.includes('butuh')) return 'status-intervensi';
   return 'status-other';
 }
+
 function markerClass(status) {
   if (!status) return 'marker-default';
   const s = String(status).toLowerCase();
   if (s.includes('dignu') || s.includes('layak')) return 'marker-dignu';
   if (s.includes('vulnerable') || s.includes('rentan')) return 'marker-vulnerable';
-  if (s.includes('interven') || s.includes('butuh')) return 'marker-intervensi';
+  if (s.includes('interven') || s.includes('reabilita') || s.includes('butuh')) return 'marker-intervensi';
   return 'marker-other';
 }
 
 function formatNum(n) { return Number(n).toLocaleString('pt-TL'); }
 
 /* ═══════════════════════════════════════════════════════════════
-   NOTIFICATION
+   NOTIFICATION & LOADING
 ═══════════════════════════════════════════════════════════════ */
 let notifTimer = null;
 function showNotif(msg, type = 'info', duration = 5000) {
@@ -161,9 +152,6 @@ function showNotif(msg, type = 'info', duration = 5000) {
   notifTimer = setTimeout(() => bar.classList.add('hidden'), duration);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   LOADING
-═══════════════════════════════════════════════════════════════ */
 function showLoading(msg = 'Karga dadus...') {
   document.getElementById('loading-message').textContent = msg;
   document.getElementById('loading-overlay').classList.remove('hidden');
@@ -176,27 +164,22 @@ function hideLoading() {
    MAP INIT
 ═══════════════════════════════════════════════════════════════ */
 function initMap() {
-  // Center on Timor-Leste (Dili region)
   APP.map = L.map('map', {
     center: [-8.874, 125.727],
     zoom: 9,
     zoomControl: false,
   });
 
-  // Zoom control
   L.control.zoom({ position: 'topright' }).addTo(APP.map);
-
-  // Scale
   L.control.scale({ imperial: false }).addTo(APP.map);
 
-  // Base layers
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   });
 
   const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles © Esri — Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP',
+    attribution: 'Tiles © Esri',
     maxZoom: 19,
   });
 
@@ -213,7 +196,6 @@ function initMap() {
     'Carto Light':    cartoLight,
   }, {}, { position: 'topright' }).addTo(APP.map);
 
-  // Cluster group
   APP.clusterGroup = L.markerClusterGroup({
     chunkedLoading: true,
     maxClusterRadius: 60,
@@ -255,10 +237,8 @@ async function readDefaultExcel() {
     const wb = XLSX.read(data, { type: 'array' });
     const sheetName = wb.SheetNames[0];
     const ws = wb.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
-    return json;
+    return XLSX.utils.sheet_to_json(ws, { defval: '' });
   } catch (err) {
-    // Try root path
     try {
       const resp2 = await fetch('Coordinate_Uma.xlsx');
       if (!resp2.ok) throw new Error('Not found at root either');
@@ -281,7 +261,6 @@ function processRawRows(rows) {
   if (!rows || rows.length === 0) return [];
   const headers = Object.keys(rows[0]);
 
-  // Detect column names
   const colId   = detectCol(headers, 'id');
   const colLat  = detectCol(headers, 'latitude');
   const colLng  = detectCol(headers, 'longitude');
@@ -292,6 +271,7 @@ function processRawRows(rows) {
   const colStat = detectCol(headers, 'status');
   const colProg = detectCol(headers, 'program');
   const colYear = detectCol(headers, 'year');
+  const colPhoto = detectCol(headers, 'photo');
 
   if (!colLat || !colLng) {
     showNotif('⚠ Kolom Latitude/Longitude la hetan. Favor verifika estrutura Excel.', 'warning', 8000);
@@ -311,11 +291,21 @@ function processRawRows(rows) {
 
     if (validity === 'invalid' || validity === 'out_of_range') {
       invalid++;
-      return; // skip
+      return;
     }
     if (validity === 'outside_tl') outsideTL++;
 
     const id = colId ? (row[colId] ?? (idx + 1)) : (idx + 1);
+    
+    // Prioritaskan nama file dari kolom FOTO jika tersedia
+    let photoList;
+    if (colPhoto && row[colPhoto] && String(row[colPhoto]).trim() !== '') {
+      const customImg = String(row[colPhoto]).trim();
+      photoList = [`images/${customImg}`, customImg];
+    } else {
+      photoList = getImagePath(id);
+    }
+
     parsed.push({
       _rowIdx:      idx,
       id:           id,
@@ -328,7 +318,7 @@ function processRawRows(rows) {
       status:       colStat ? (row[colStat] ?? '') : '',
       program:      colProg ? (row[colProg] ?? '') : '',
       year:         colYear ? (row[colYear] ?? '') : '',
-      imagePaths:   getImagePath(id),
+      imagePaths:   photoList,
     });
   });
 
@@ -371,7 +361,7 @@ async function loadData(rows) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 /* ═══════════════════════════════════════════════════════════════
-   MARKERS
+   MARKERS & POPUP
 ═══════════════════════════════════════════════════════════════ */
 function buildMarkerIcon(status) {
   const cls = markerClass(status);
@@ -395,9 +385,6 @@ function renderMarkers(data) {
     marker.bindPopup(() => buildPopupHTML(house), {
       maxWidth: 300,
       className: 'house-popup',
-    });
-    marker.on('popupopen', () => {
-      // Lazy-load image verification happens in popup
     });
     APP.markers[house.id] = marker;
     APP.clusterGroup.addLayer(marker);
@@ -455,6 +442,7 @@ function populateFilters() {
 
   fields.forEach(field => {
     const sel = document.getElementById(ids[field]);
+    if (!sel) return;
     const values = [...new Set(APP.allData.map(d => d[field]).filter(Boolean))].sort();
     sel.innerHTML = `<option value="">${labels[field]}</option>`;
     values.forEach(v => {
@@ -466,14 +454,14 @@ function populateFilters() {
 }
 
 function applyFilters() {
-  const mun   = document.getElementById('filter-municipality').value;
-  const post  = document.getElementById('filter-post').value;
-  const suco  = document.getElementById('filter-suco').value;
-  const aldeia= document.getElementById('filter-aldeia').value;
-  const status= document.getElementById('filter-status').value;
-  const prog  = document.getElementById('filter-program').value;
-  const year  = document.getElementById('filter-year').value;
-  const q     = document.getElementById('search-input').value.trim().toLowerCase();
+  const mun   = document.getElementById('filter-municipality')?.value || '';
+  const post  = document.getElementById('filter-post')?.value || '';
+  const suco  = document.getElementById('filter-suco')?.value || '';
+  const aldeia= document.getElementById('filter-aldeia')?.value || '';
+  const status= document.getElementById('filter-status')?.value || '';
+  const prog  = document.getElementById('filter-program')?.value || '';
+  const year  = document.getElementById('filter-year')?.value || '';
+  const q     = document.getElementById('search-input')?.value.trim().toLowerCase() || '';
 
   APP.filtered = APP.allData.filter(d => {
     if (mun    && d.municipality !== mun)   return false;
@@ -506,11 +494,11 @@ function updateKPI(data) {
   document.getElementById('kpi-total').textContent = formatNum(data.length);
 
   const dignu = data.filter(d => String(d.status).toLowerCase().includes('dignu') ||
-                                  String(d.program).toLowerCase().includes('dignu')).length;
+                                 String(d.program).toLowerCase().includes('dignu')).length;
   document.getElementById('kpi-dignu').textContent = formatNum(dignu);
 
   const vuln = data.filter(d => String(d.status).toLowerCase().includes('vulnerable') ||
-                                 String(d.status).toLowerCase().includes('rentan')).length;
+                                String(d.status).toLowerCase().includes('rentan')).length;
   document.getElementById('kpi-vulnerable').textContent = formatNum(vuln);
 
   const munSet = new Set(data.map(d => d.municipality).filter(Boolean));
@@ -543,7 +531,6 @@ const CHART_COLORS = [
 function renderCharts(data) {
   renderBarChart('chart-municipality', data, 'municipality', 'Uma ba Munisípiu');
   renderPieChart('chart-status', data, 'status', 'Status Uma');
-  // Relatóriu charts
   renderBarChart('chart-r-municipality', data, 'municipality', 'Uma ba Munisípiu');
   renderPieChart('chart-r-status', data, 'status', 'Status Uma');
   renderBarChart('chart-r-program', data, 'program', 'Uma ba Programa');
@@ -616,7 +603,6 @@ function renderTable(data) {
         .join(' ').toLowerCase().includes(q))
     : data;
 
-  // Sort
   rows = [...rows].sort((a, b) => {
     let av = a[APP.sort.col] ?? a._rowIdx;
     let bv = b[APP.sort.col] ?? b._rowIdx;
@@ -748,16 +734,16 @@ window.openDetail = function(id) {
        </div>`;
 
   const fields = [
-    { label: 'ID Uma',            val: `UMA-${String(house.id).padStart(3,'0')}` },
-    { label: 'Munisípiu',         val: house.municipality },
+    { label: 'ID Uma',             val: `UMA-${String(house.id).padStart(3,'0')}` },
+    { label: 'Munisípiu',          val: house.municipality },
     { label: 'Postu Administrativu', val: house.post },
-    { label: 'Suco',              val: house.suco },
-    { label: 'Aldeia',            val: house.aldeia },
-    { label: 'Status',            val: house.status },
-    { label: 'Programa',          val: house.program },
-    { label: 'Tinan',             val: house.year },
-    { label: 'Latitude',          val: house.latitude.toFixed(6) },
-    { label: 'Longitude',         val: house.longitude.toFixed(6) },
+    { label: 'Suco',               val: house.suco },
+    { label: 'Aldeia',             val: house.aldeia },
+    { label: 'Status',             val: house.status },
+    { label: 'Programa',           val: house.program },
+    { label: 'Tinan',              val: house.year },
+    { label: 'Latitude',           val: house.latitude.toFixed(6) },
+    { label: 'Longitude',          val: house.longitude.toFixed(6) },
   ];
 
   const infoHtml = fields.map(f => f.val
@@ -774,7 +760,7 @@ window.openDetail = function(id) {
     <div class="modal-title"><i class="fa-solid fa-house"></i> UMA-${sanitize(String(house.id).padStart(3,'0'))}</div>
     <div class="modal-info-grid">${infoHtml}</div>
     <div class="modal-actions">
-      <button class="btn-modal zoom"  onclick="goToMarker('${sid}');closeModal()"><i class="fa-solid fa-magnifying-glass-location"></i> Zoom Mapa</button>
+      <button class="btn-modal zoom"   onclick="goToMarker('${sid}');closeModal()"><i class="fa-solid fa-magnifying-glass-location"></i> Zoom Mapa</button>
       <button class="btn-modal green" onclick="navigateTo('${sid}');closeModal()"><i class="fa-solid fa-route"></i> Nabegasaun</button>
       <a class="btn-modal gmaps" href="${gmapsUrl}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-google"></i> Google Maps</a>
     </div>`;
@@ -790,7 +776,6 @@ window.closeModal = function() {
    MAP ACTIONS
 ═══════════════════════════════════════════════════════════════ */
 window.goToMarker = function(id) {
-  // Switch to dashboard view which has the map
   switchView('dashboard');
   const house = APP.allData.find(d => String(d.id) === String(id));
   if (!house) return;
@@ -835,10 +820,8 @@ function fallbackNavigate(house) {
 }
 
 function startRoute(fromLat, fromLng, house) {
-  // Clear existing route
   clearRoute();
 
-  // Show user location marker
   if (APP.userMarker) APP.map.removeLayer(APP.userMarker);
   APP.userMarker = L.marker([fromLat, fromLng], {
     icon: L.divIcon({
@@ -862,7 +845,7 @@ function startRoute(fromLat, fromLng, house) {
     },
     createMarker: function(i, wp) {
       if (i === 1) return L.marker(wp.latLng, { icon: buildMarkerIcon(house.status) });
-      return null; // user marker already added
+      return null;
     },
     router: L.Routing.osrmv1({
       serviceUrl: 'https://router.project-osrm.org/route/v1',
@@ -894,7 +877,6 @@ function onSearch(e) {
   searchTimer = setTimeout(() => {
     const q = e.target.value.trim().toLowerCase();
     if (q.length >= 1) {
-      // Try exact ID match first → zoom
       const exact = APP.allData.find(d => String(d.id).toLowerCase() === q ||
         `uma-${String(d.id).padStart(3,'0')}`.toLowerCase() === q);
       if (exact) {
@@ -903,7 +885,6 @@ function onSearch(e) {
         applyFilters();
         return;
       }
-      // zoom to found
       switchView('dashboard');
       setTimeout(() => {
         APP.map.setView([exact.latitude, exact.longitude], 16);
@@ -933,12 +914,10 @@ function switchView(viewName) {
   const navItem = document.querySelector(`.nav-item[data-view="${viewName}"]`);
   if (navItem) navItem.classList.add('active');
 
-  // On mobile: close sidebar after navigation
   if (window.innerWidth < 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
   }
 
-  // Invalidate map size after view switch
   if (viewName === 'dashboard') setTimeout(() => APP.map && APP.map.invalidateSize(), 120);
 }
 
@@ -1049,7 +1028,7 @@ function readCSV(file) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   TABLE SORT
+   TABLE SORT & SEARCH
 ═══════════════════════════════════════════════════════════════ */
 function initTableSort() {
   document.querySelectorAll('#data-table th[data-col]').forEach(th => {
@@ -1069,9 +1048,6 @@ function initTableSort() {
   });
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   TABLE SEARCH (separate from map search)
-═══════════════════════════════════════════════════════════════ */
 let tableSearchTimer = null;
 function initTableSearch() {
   document.getElementById('table-search').addEventListener('input', (e) => {
@@ -1085,25 +1061,20 @@ function initTableSearch() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   INIT — BOOT SEQUENCE
+   INIT
 ═══════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', async () => {
-  // Init map
   initMap();
-
-  // Init UI controls
   initSidebar();
   initMyLocation();
   initImport();
   initTableSort();
   initTableSearch();
 
-  // Nav items
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       const view = item.dataset.view;
-      // "mapa" redirects to dashboard (same map)
       if (view === 'mapa') {
         switchView('dashboard');
         setTimeout(() => {
@@ -1116,22 +1087,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Filter listeners
   ['filter-municipality','filter-post','filter-suco','filter-aldeia',
    'filter-status','filter-program','filter-year'].forEach(id => {
-    document.getElementById(id).addEventListener('change', applyFilters);
+    document.getElementById(id)?.addEventListener('change', applyFilters);
   });
 
-  // Search input
-  document.getElementById('search-input').addEventListener('input', onSearch);
+  document.getElementById('search-input')?.addEventListener('input', onSearch);
 
-  // Reset filter
-  document.getElementById('btn-reset-filter').addEventListener('click', () => {
+  document.getElementById('btn-reset-filter')?.addEventListener('click', () => {
     ['filter-municipality','filter-post','filter-suco','filter-aldeia',
      'filter-status','filter-program','filter-year'].forEach(id => {
-      document.getElementById(id).value = '';
+      const el = document.getElementById(id);
+      if (el) el.value = '';
     });
-    document.getElementById('search-input').value = '';
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
     APP.filtered = [...APP.allData];
     APP.pagination.page = 1;
     renderMarkers(APP.filtered);
@@ -1141,21 +1111,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderGaleria(APP.filtered);
   });
 
-  // Clear route button
-  document.getElementById('btn-clear-route').addEventListener('click', clearRoute);
-
-  // Modal close
-  document.getElementById('modal-close-btn').addEventListener('click', closeModal);
-  document.getElementById('modal-detail').addEventListener('click', (e) => {
+  document.getElementById('btn-clear-route')?.addEventListener('click', clearRoute);
+  document.getElementById('modal-close-btn')?.addEventListener('click', closeModal);
+  document.getElementById('modal-detail')?.addEventListener('click', (e) => {
     if (e.target === document.getElementById('modal-detail')) closeModal();
   });
 
-  // ESC key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
   });
 
-  // Load default Excel
   showLoading('Karga dadus Excel default...');
   const rows = await readDefaultExcel();
   if (rows) {

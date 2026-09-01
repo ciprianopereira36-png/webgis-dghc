@@ -145,7 +145,6 @@ select, input { font-size: 0.875rem; }
 }
 .kpi-blue  .kpi-icon { background: #eff6ff; color: var(--blue-light); }
 .kpi-green .kpi-icon { background: #f0fdf4; color: var(--green-light); }
-.kpi-yellow.kpi-icon,
 .kpi-yellow .kpi-icon { background: #fffbeb; color: var(--yellow-light); }
 .kpi-purple .kpi-icon { background: #f5f3ff; color: var(--purple-light); }
 
@@ -251,6 +250,7 @@ select, input { font-size: 0.875rem; }
 .status-vulnerable { background: #fef9c3; color: #b45309; }
 .status-intervensi { background: #fee2e2; color: #dc2626; }
 .status-other      { background: #dbeafe; color: #1d4ed8; }
+
 .popup-actions {
   display: flex; gap: 8px; padding: 0 14px 12px;
 }
@@ -462,6 +462,10 @@ select, input { font-size: 0.875rem; }
   display: inline-block; padding: 2px 8px; border-radius: 20px;
   font-size: 0.7rem; font-weight: 600;
 }
+.badge.status-dignu       { background: #dcfce7; color: #15803d; }
+.badge.status-vulnerable  { background: #fef9c3; color: #b45309; }
+.badge.status-intervensi  { background: #fee2e2; color: #dc2626; }
+.badge.status-other       { background: #dbeafe; color: #1d4ed8; }
 
 /* Sort arrows */
 th.sort-asc::after  { content: ' ↑'; color: var(--blue); }
