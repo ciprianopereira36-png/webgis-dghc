@@ -146,6 +146,7 @@ function formatNum(n) { return Number(n).toLocaleString('pt-TL'); }
 let notifTimer = null;
 function showNotif(msg, type = 'info', duration = 5000) {
   const bar = document.getElementById('notification-bar');
+  if (!bar) return;
   bar.className = `notification-bar ${type}`;
   bar.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'circle-check' : type === 'error' ? 'circle-xmark' : type === 'warning' ? 'triangle-exclamation' : 'circle-info'}"></i> ${sanitize(msg)}`;
   bar.classList.remove('hidden');
@@ -154,17 +155,23 @@ function showNotif(msg, type = 'info', duration = 5000) {
 }
 
 function showLoading(msg = 'Karga dadus...') {
-  document.getElementById('loading-message').textContent = msg;
-  document.getElementById('loading-overlay').classList.remove('hidden');
+  const elMsg = document.getElementById('loading-message');
+  const elOverlay = document.getElementById('loading-overlay');
+  if (elMsg) elMsg.textContent = msg;
+  if (elOverlay) elOverlay.classList.remove('hidden');
 }
 function hideLoading() {
-  document.getElementById('loading-overlay').classList.add('hidden');
+  const elOverlay = document.getElementById('loading-overlay');
+  if (elOverlay) elOverlay.classList.add('hidden');
 }
 
 /* ═══════════════════════════════════════════════════════════════
    MAP INIT
 ═══════════════════════════════════════════════════════════════ */
 function initMap() {
+  const mapEl = document.getElementById('map');
+  if (!mapEl) return;
+
   APP.map = L.map('map', {
     center: [-8.874, 125.727],
     zoom: 9,
@@ -373,6 +380,7 @@ function buildMarkerIcon(status) {
 }
 
 function renderMarkers(data) {
+  if (!APP.clusterGroup) return;
   APP.clusterGroup.clearLayers();
   APP.markers = {};
 
@@ -489,18 +497,23 @@ function applyFilters() {
    KPI
 ═══════════════════════════════════════════════════════════════ */
 function updateKPI(data) {
-  document.getElementById('kpi-total').textContent = formatNum(data.length);
+  const kpiTot = document.getElementById('kpi-total');
+  const kpiDig = document.getElementById('kpi-dignu');
+  const kpiVul = document.getElementById('kpi-vulnerable');
+  const kpiMun = document.getElementById('kpi-municipality');
+
+  if (kpiTot) kpiTot.textContent = formatNum(data.length);
 
   const dignu = data.filter(d => String(d.status).toLowerCase().includes('dignu') ||
                                  String(d.program).toLowerCase().includes('dignu')).length;
-  document.getElementById('kpi-dignu').textContent = formatNum(dignu);
+  if (kpiDig) kpiDig.textContent = formatNum(dignu);
 
   const vuln = data.filter(d => String(d.status).toLowerCase().includes('vulnerable') ||
                                 String(d.status).toLowerCase().includes('rentan')).length;
-  document.getElementById('kpi-vulnerable').textContent = formatNum(vuln);
+  if (kpiVul) kpiVul.textContent = formatNum(vuln);
 
   const munSet = new Set(data.map(d => d.municipality).filter(Boolean));
-  document.getElementById('kpi-municipality').textContent = formatNum(munSet.size || (data.length > 0 ? '—' : '0'));
+  if (kpiMun) kpiMun.textContent = formatNum(munSet.size || (data.length > 0 ? '—' : '0'));
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -537,7 +550,7 @@ function renderCharts(data) {
 
 function renderBarChart(canvasId, data, field, label) {
   const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
+  if (!canvas || typeof Chart === 'undefined') return;
   const countObj = countBy(data, field);
   const { labels, values } = buildBarData(countObj, 13);
 
@@ -567,7 +580,7 @@ function renderBarChart(canvasId, data, field, label) {
 
 function renderPieChart(canvasId, data, field, label) {
   const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
+  if (!canvas || typeof Chart === 'undefined') return;
   const countObj = countBy(data, field);
   const labels = Object.keys(countObj);
   const values = Object.values(countObj);
@@ -618,6 +631,8 @@ function renderTable(data) {
   const pageRows = rows.slice(start, start + perPage);
 
   const tbody = document.getElementById('table-body');
+  if (!tbody) return;
+
   if (!pageRows.length) {
     tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:24px">Dadus la hetan.</td></tr>`;
   } else {
@@ -657,6 +672,7 @@ function renderTable(data) {
 
 function renderPagination(total, page, perPage) {
   const bar = document.getElementById('pagination-bar');
+  if (!bar) return;
   const totalPages = Math.ceil(total / perPage);
   if (totalPages <= 1) { bar.innerHTML = `<span class="page-info">${formatNum(total)} rekord</span>`; return; }
 
@@ -685,6 +701,7 @@ window.changePage = function(p) {
 ═══════════════════════════════════════════════════════════════ */
 function renderGaleria(data) {
   const grid = document.getElementById('galeria-grid');
+  if (!grid) return;
   if (!data.length) {
     grid.innerHTML = `<p style="color:#94a3b8;padding:16px">Dadus la hetan.</p>`;
     return;
@@ -732,16 +749,16 @@ window.openDetail = function(id) {
        </div>`;
 
   const fields = [
-    { label: 'ID Uma',             val: `UMA-${String(house.id).padStart(3,'0')}` },
-    { label: 'Munisípiu',          val: house.municipality },
+    { label: 'ID Uma',               val: `UMA-${String(house.id).padStart(3,'0')}` },
+    { label: 'Munisípiu',            val: house.municipality },
     { label: 'Postu Administrativu', val: house.post },
-    { label: 'Suco',               val: house.suco },
-    { label: 'Aldeia',             val: house.aldeia },
-    { label: 'Status',             val: house.status },
-    { label: 'Programa',           val: house.program },
-    { label: 'Tinan',              val: house.year },
-    { label: 'Latitude',           val: house.latitude.toFixed(6) },
-    { label: 'Longitude',          val: house.longitude.toFixed(6) },
+    { label: 'Suco',                 val: house.suco },
+    { label: 'Aldeia',               val: house.aldeia },
+    { label: 'Status',               val: house.status },
+    { label: 'Programa',             val: house.program },
+    { label: 'Tinan',                val: house.year },
+    { label: 'Latitude',             val: house.latitude.toFixed(6) },
+    { label: 'Longitude',            val: house.longitude.toFixed(6) },
   ];
 
   const infoHtml = fields.map(f => f.val
@@ -753,21 +770,24 @@ window.openDetail = function(id) {
 
   const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${house.latitude},${house.longitude}`;
 
-  document.getElementById('modal-body-content').innerHTML = `
-    ${photoHtml}
-    <div class="modal-title"><i class="fa-solid fa-house"></i> UMA-${sanitize(String(house.id).padStart(3,'0'))}</div>
-    <div class="modal-info-grid">${infoHtml}</div>
-    <div class="modal-actions">
-      <button class="btn-modal zoom"   onclick="goToMarker('${sid}');closeModal()"><i class="fa-solid fa-magnifying-glass-location"></i> Zoom Mapa</button>
-      <button class="btn-modal green" onclick="navigateTo('${sid}');closeModal()"><i class="fa-solid fa-route"></i> Nabegasaun</button>
-      <a class="btn-modal gmaps" href="${gmapsUrl}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-google"></i> Google Maps</a>
-    </div>`;
+  const modalBody = document.getElementById('modal-body-content');
+  if (modalBody) {
+    modalBody.innerHTML = `
+      ${photoHtml}
+      <div class="modal-title"><i class="fa-solid fa-house"></i> UMA-${sanitize(String(house.id).padStart(3,'0'))}</div>
+      <div class="modal-info-grid">${infoHtml}</div>
+      <div class="modal-actions">
+        <button class="btn-modal zoom"   onclick="goToMarker('${sid}');closeModal()"><i class="fa-solid fa-magnifying-glass-location"></i> Zoom Mapa</button>
+        <button class="btn-modal green" onclick="navigateTo('${sid}');closeModal()"><i class="fa-solid fa-route"></i> Nabegasaun</button>
+        <a class="btn-modal gmaps" href="${gmapsUrl}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-google"></i> Google Maps</a>
+      </div>`;
+  }
 
-  document.getElementById('modal-detail').classList.remove('hidden');
+  document.getElementById('modal-detail')?.classList.remove('hidden');
 };
 
 window.closeModal = function() {
-  document.getElementById('modal-detail').classList.add('hidden');
+  document.getElementById('modal-detail')?.classList.add('hidden');
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -778,9 +798,9 @@ window.goToMarker = function(id) {
   const house = APP.allData.find(d => String(d.id) === String(id));
   if (!house) return;
   setTimeout(() => {
-    APP.map.setView([house.latitude, house.longitude], 16);
+    if (APP.map) APP.map.setView([house.latitude, house.longitude], 16);
     const marker = APP.markers[house.id];
-    if (marker) {
+    if (marker && APP.clusterGroup) {
       APP.clusterGroup.zoomToShowLayer(marker, () => {
         marker.openPopup();
       });
@@ -820,7 +840,7 @@ function fallbackNavigate(house) {
 function startRoute(fromLat, fromLng, house) {
   clearRoute();
 
-  if (APP.userMarker) APP.map.removeLayer(APP.userMarker);
+  if (APP.userMarker && APP.map) APP.map.removeLayer(APP.userMarker);
   APP.userMarker = L.marker([fromLat, fromLng], {
     icon: L.divIcon({
       className: '',
@@ -830,40 +850,42 @@ function startRoute(fromLat, fromLng, house) {
     zIndexOffset: 1000,
   }).addTo(APP.map).bindPopup('📍 Lokasaun Ita-Nia').openPopup();
 
-  APP.routeControl = L.Routing.control({
-    waypoints: [
-      L.latLng(fromLat, fromLng),
-      L.latLng(house.latitude, house.longitude),
-    ],
-    routeWhileDragging: false,
-    showAlternatives: false,
-    fitSelectedRoutes: true,
-    lineOptions: {
-      styles: [{ color: '#3b82f6', weight: 4, opacity: 0.8 }],
-    },
-    createMarker: function(i, wp) {
-      if (i === 1) return L.marker(wp.latLng, { icon: buildMarkerIcon(house.status) });
-      return null;
-    },
-    router: L.Routing.osrmv1({
-      serviceUrl: 'https://router.project-osrm.org/route/v1',
-    }),
-  }).addTo(APP.map);
+  if (typeof L.Routing !== 'undefined') {
+    APP.routeControl = L.Routing.control({
+      waypoints: [
+        L.latLng(fromLat, fromLng),
+        L.latLng(house.latitude, house.longitude),
+      ],
+      routeWhileDragging: false,
+      showAlternatives: false,
+      fitSelectedRoutes: true,
+      lineOptions: {
+        styles: [{ color: '#3b82f6', weight: 4, opacity: 0.8 }],
+      },
+      createMarker: function(i, wp) {
+        if (i === 1) return L.marker(wp.latLng, { icon: buildMarkerIcon(house.status) });
+        return null;
+      },
+      router: L.Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1',
+      }),
+    }).addTo(APP.map);
+  }
 
-  document.getElementById('btn-clear-route').classList.remove('hidden');
+  document.getElementById('btn-clear-route')?.classList.remove('hidden');
   showNotif('🧭 Rota hahú husi lokasaun ita-nia ba uma ne\'ebé hili.', 'info', 5000);
 }
 
 function clearRoute() {
-  if (APP.routeControl) {
+  if (APP.routeControl && APP.map) {
     try { APP.map.removeControl(APP.routeControl); } catch(e) {}
     APP.routeControl = null;
   }
-  if (APP.userMarker) {
+  if (APP.userMarker && APP.map) {
     APP.map.removeLayer(APP.userMarker);
     APP.userMarker = null;
   }
-  document.getElementById('btn-clear-route').classList.add('hidden');
+  document.getElementById('btn-clear-route')?.classList.add('hidden');
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -885,9 +907,9 @@ function onSearch(e) {
       }
       switchView('dashboard');
       setTimeout(() => {
-        APP.map.setView([exact.latitude, exact.longitude], 16);
+        if (APP.map) APP.map.setView([exact.latitude, exact.longitude], 16);
         const m = APP.markers[exact.id];
-        if (m) { APP.clusterGroup.zoomToShowLayer(m, () => m.openPopup()); }
+        if (m && APP.clusterGroup) { APP.clusterGroup.zoomToShowLayer(m, () => m.openPopup()); }
       }, 150);
       updateKPI(APP.filtered);
       renderMarkers(APP.filtered);
@@ -913,7 +935,7 @@ function switchView(viewName) {
   if (navItem) navItem.classList.add('active');
 
   if (window.innerWidth < 768) {
-    document.getElementById('sidebar').classList.remove('mobile-open');
+    document.getElementById('sidebar')?.classList.remove('mobile-open');
   }
 
   if (viewName === 'dashboard') setTimeout(() => APP.map && APP.map.invalidateSize(), 120);
@@ -927,22 +949,26 @@ function initSidebar() {
   const wrapper = document.getElementById('main-wrapper');
   const toggle  = document.getElementById('sidebar-toggle');
 
-  toggle.addEventListener('click', () => {
-    if (window.innerWidth < 768) {
-      sidebar.classList.toggle('mobile-open');
-    } else {
-      sidebar.classList.toggle('collapsed');
-      wrapper.classList.toggle('expanded');
-      setTimeout(() => APP.map && APP.map.invalidateSize(), 260);
-    }
-  });
+  if (toggle && sidebar && wrapper) {
+    toggle.addEventListener('click', () => {
+      if (window.innerWidth < 768) {
+        sidebar.classList.toggle('mobile-open');
+      } else {
+        sidebar.classList.toggle('collapsed');
+        wrapper.classList.toggle('expanded');
+        setTimeout(() => APP.map && APP.map.invalidateSize(), 260);
+      }
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
    MY LOCATION
 ═══════════════════════════════════════════════════════════════ */
 function initMyLocation() {
-  document.getElementById('btn-my-location').addEventListener('click', () => {
+  const btn = document.getElementById('btn-my-location');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
     if (!navigator.geolocation) {
       showNotif('Browser la suporta geolokasaun.', 'error');
       return;
@@ -954,8 +980,8 @@ function initMyLocation() {
         const { latitude: lat, longitude: lng } = pos.coords;
         switchView('dashboard');
         setTimeout(() => {
-          APP.map.setView([lat, lng], 14);
-          if (APP.userMarker) APP.map.removeLayer(APP.userMarker);
+          if (APP.map) APP.map.setView([lat, lng], 14);
+          if (APP.userMarker && APP.map) APP.map.removeLayer(APP.userMarker);
           APP.userMarker = L.marker([lat, lng], {
             icon: L.divIcon({
               className: '',
@@ -979,7 +1005,9 @@ function initMyLocation() {
    IMPORT EXCEL
 ═══════════════════════════════════════════════════════════════ */
 function initImport() {
-  document.getElementById('excel-input').addEventListener('change', async (e) => {
+  const input = document.getElementById('excel-input');
+  if (!input) return;
+  input.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -1048,7 +1076,9 @@ function initTableSort() {
 
 let tableSearchTimer = null;
 function initTableSearch() {
-  document.getElementById('table-search').addEventListener('input', (e) => {
+  const el = document.getElementById('table-search');
+  if (!el) return;
+  el.addEventListener('input', (e) => {
     clearTimeout(tableSearchTimer);
     tableSearchTimer = setTimeout(() => {
       APP.tableSearch = e.target.value.trim();
@@ -1076,7 +1106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (view === 'mapa') {
         switchView('dashboard');
         setTimeout(() => {
-          document.querySelector('.map-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          document.querySelector('.map-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           APP.map && APP.map.invalidateSize();
         }, 150);
       } else {
