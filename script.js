@@ -1,7 +1,7 @@
 /* ================================================================
    WEB GIS DGHC – script.js
    DGHC Habitasaun Timor-Leste
-   Versão 1.0 – 2025
+   Versão 1.2 – Suporta GEOJSON_URL & FOTO husi Google Drive
    ================================================================ */
 
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTlZMbaAfDU2HN-CMLFAyDBzvP4wyVNOGj7c39AmE-wATKipXWqQDYu-PmtR7yb19nt_k_8aFQ-yw_6/pub?gid=580851566&single=true&output=csv';
@@ -21,6 +21,7 @@ const COLUMN_MAP = {
   program:      ['programa', 'program', 'projetu'],
   year:         ['tinan', 'year', 'tahun', 'ano'],
   photo:        ['foto', 'photo', 'image', 'gambar', 'link_foto', 'foto_drive'],
+  polygon:      ['geojson_url', 'geojson url', 'polygon', 'poligon', 'geojson', 'parcela', 'link_polygon', 'shp']
 };
 
 /* ─────────────────────────────────────────────────────────────────
@@ -36,15 +37,17 @@ const IMAGE_CONFIG = {
    APLIKASI STATE
 ═══════════════════════════════════════════════════════════════ */
 const APP = {
-  allData:      [],
-  filtered:     [],
-  map:          null,
-  clusterGroup: null,
-  markers:      {},
-  charts:       {},
-  userMarker:   null,
-  routeControl: null,
-  currentView:  'dashboard',
+  allData:       [],
+  filtered:      [],
+  map:           null,
+  clusterGroup:  null,
+  polygonGroup:  null,
+  layerControl:  null,
+  markers:       {},
+  charts:        {},
+  userMarker:    null,
+  routeControl:  null,
+  currentView:   'dashboard',
   pagination: { page: 1, perPage: 15 },
   sort:       { col: 'no', dir: 'asc' },
   tableSearch: '',
@@ -106,26 +109,24 @@ function validateCoord(lat, lng) {
   return 'ok';
 }
 
-/**
- * Konversi link Google Drive (view, sharing, drive_link) menjadi Direct Image Link
- */
-function formatGoogleDriveUrl(url) {
+function extractDriveFileId(url) {
   if (!url) return null;
   const trimmed = String(url).trim();
-  
-  // Tangkap ID file dari semua jenis format URL Google Drive
   const driveRegex = /(?:\/file\/d\/|[?&]id=)([a-zA-Z0-9_-]{25,})/;
   const match = trimmed.match(driveRegex);
-  
-  if (match && match[1]) {
-    return `https://lh3.googleusercontent.com/d/${match[1]}=s800`;
-  }
+  return (match && match[1]) ? match[1] : null;
+}
 
-  // Jika URL gambar langsung (misal https://...jpg)
+function formatGoogleDriveUrl(url) {
+  if (!url) return null;
+  const fileId = extractDriveFileId(url);
+  if (fileId) {
+    return `https://lh3.googleusercontent.com/d/${fileId}=s800`;
+  }
+  const trimmed = String(url).trim();
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
   }
-
   return null;
 }
 
@@ -204,7 +205,7 @@ function initMap() {
   L.control.scale({ imperial: false }).addTo(APP.map);
 
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    attribution: '© OpenStreetMap contributors',
     maxZoom: 19,
   });
 
@@ -220,18 +221,121 @@ function initMap() {
 
   osm.addTo(APP.map);
 
-  L.control.layers({
-    'OpenStreetMap':  osm,
-    'Satellite':      satellite,
-    'Carto Light':    cartoLight,
-  }, {}, { position: 'topright' }).addTo(APP.map);
+  // Group layer Polygon
+  APP.polygonGroup = L.featureGroup().addTo(APP.map);
 
+  // Group Marker Cluster
   APP.clusterGroup = L.markerClusterGroup({
     chunkedLoading: true,
     maxClusterRadius: 60,
     showCoverageOnHover: false,
   });
   APP.map.addLayer(APP.clusterGroup);
+
+  // Control layer switch
+  APP.layerControl = L.control.layers({
+    'OpenStreetMap': osm,
+    'Satellite':     satellite,
+    'Carto Light':   cartoLight,
+  }, {
+    '📍 Uma / Pontus': APP.clusterGroup,
+    '⬡ Parcela / Poligon': APP.polygonGroup
+  }, { position: 'topright' }).addTo(APP.map);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GEOJSON LOADER DARI GOOGLE DRIVE DENGAN CORS PROXY
+═══════════════════════════════════════════════════════════════ */
+async function fetchGeoJSONFromDrive(driveUrlOrId) {
+  const fileId = extractDriveFileId(driveUrlOrId) || driveUrlOrId;
+  if (!fileId || fileId.length < 20) return null;
+
+  const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+  
+  // Proxy CORS untuk membaca respons teks/JSON Google Drive di web publik
+  const proxyEndpoints = [
+    `https://corsproxy.io/?url=${encodeURIComponent(downloadUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(downloadUrl)}`
+  ];
+
+  for (const endpoint of proxyEndpoints) {
+    try {
+      const resp = await fetch(endpoint);
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (e) {
+      console.warn('Proxy gagal, mencoba fallback proxy...', e);
+    }
+  }
+  return null;
+}
+
+function renderSingleGeoJSON(geojsonData, labelName = 'Parcela') {
+  if (!geojsonData || !APP.polygonGroup) return null;
+
+  const polyLayer = L.geoJSON(geojsonData, {
+    style: function () {
+      return {
+        color: '#0284c7',       // Garis batas biru
+        weight: 2.5,
+        opacity: 0.9,
+        fillColor: '#38bdf8',   // Warna isi biru muda
+        fillOpacity: 0.35,
+      };
+    },
+    onEachFeature: function (feature, l) {
+      l.on({
+        mouseover: function (e) {
+          e.target.setStyle({ weight: 4, fillOpacity: 0.55, color: '#f59e0b' });
+        },
+        mouseout: function (e) {
+          polyLayer.resetStyle(e.target);
+        }
+      });
+
+      if (feature.properties) {
+        const p = feature.properties;
+        let html = `<div style="font-size:12px; max-height:200px; overflow-y:auto;">`;
+        html += `<strong style="color:#0369a1; font-size:13px;"><i class="fa-solid fa-draw-polygon"></i> ${sanitize(labelName)}</strong><hr style="margin:4px 0; border:0; border-top:1px solid #cbd5e1;">`;
+        for (const k in p) {
+          if (p[k] !== undefined && p[k] !== null && p[k] !== '') {
+            html += `<b>${sanitize(k)}:</b> ${sanitize(p[k])}<br/>`;
+          }
+        }
+        html += `</div>`;
+        l.bindPopup(html);
+      }
+    }
+  });
+
+  APP.polygonGroup.addLayer(polyLayer);
+  polyLayer.bringToBack();
+  return polyLayer;
+}
+
+async function loadAllPolygons() {
+  if (!APP.polygonGroup) return;
+  APP.polygonGroup.clearLayers();
+
+  // Ambil semua data baris yang memiliki tautan di kolom GEOJSON_URL
+  const rowsWithPoly = APP.allData.filter(d => d.polygon);
+  const loadedIds = new Set();
+
+  for (const row of rowsWithPoly) {
+    const fileId = extractDriveFileId(row.polygon);
+    if (!fileId || loadedIds.has(fileId)) continue;
+    loadedIds.add(fileId);
+
+    try {
+      const geo = await fetchGeoJSONFromDrive(fileId);
+      if (geo) {
+        renderSingleGeoJSON(geo, `Parcela UMA-${String(row.id).padStart(3,'0')}`);
+      }
+    } catch (err) {
+      console.warn(`Gagal memuat poligon ID ${row.id}:`, err);
+    }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -248,9 +352,7 @@ function readExcel(file) {
         const ws = wb.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
         resolve(json);
-      } catch (err) {
-        reject(err);
-      }
+      } catch (err) { reject(err); }
     };
     reader.onerror = reject;
     reader.readAsArrayBuffer(file);
@@ -300,6 +402,7 @@ function processRawRows(rows) {
   const colProg  = detectCol(headers, 'program');
   const colYear  = detectCol(headers, 'year');
   const colPhoto = detectCol(headers, 'photo');
+  const colPoly  = detectCol(headers, 'polygon');
 
   if (!colLat || !colLng) {
     showNotif('⚠ Kolom Latitude/Longitude la hetan. Favor verifika estrutura Excel.', 'warning', 8000);
@@ -325,7 +428,7 @@ function processRawRows(rows) {
 
     const id = colId ? (row[colId] ?? (idx + 1)) : (idx + 1);
     
-    // Logika pemilihan foto: Google Drive / Link URL / File Lokal
+    // Konversi foto dari Google Drive / Link Gambar
     let photoList = [];
     const rawPhotoVal = colPhoto ? String(row[colPhoto] || '').trim() : '';
 
@@ -353,6 +456,7 @@ function processRawRows(rows) {
       program:      colProg ? (row[colProg] ?? '') : '',
       year:         colYear ? (row[colYear] ?? '') : '',
       imagePaths:   photoList,
+      polygon:      colPoly ? String(row[colPoly] || '').trim() : '',
     });
   });
 
@@ -374,11 +478,12 @@ async function loadData(rows) {
   APP.filtered = [...parsed];
   APP.pagination.page = 1;
 
-  showLoading('Kria marker mapa...');
+  showLoading('Kria marker mapa no poligon...');
   await sleep(40);
 
   populateFilters();
   renderMarkers(APP.filtered);
+  await loadAllPolygons();
 
   showLoading('Atualiza KPI no gráfiku...');
   await sleep(40);
