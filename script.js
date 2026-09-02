@@ -4,7 +4,7 @@
    Versão 1.0 – 2025
    ================================================================ */
 
-const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT_ARyv6m54Gilboq9bxTTmj6YmEacoTUXgQfEQOg7ezeMFWOFIHLe5wfctUYwDtg/pub?gid=580851566&single=true&output=csv';
+const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTlZMbaAfDU2HN-CMLFAyDBzvP4wyVNOGj7c39AmE-wATKipXWqQDYu-PmtR7yb19nt_k_8aFQ-yw_6/pub?gid=580851566&single=true&output=csv';
 
 /* ─────────────────────────────────────────────────────────────────
    COLUMN MAPPING CONFIGURATION
