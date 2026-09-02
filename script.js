@@ -1,7 +1,7 @@
 /* ================================================================
    WEB GIS DGHC – script.js
    DGHC Habitasaun Timor-Leste
-   Versão 1.2 – Suporta GEOJSON_URL & FOTO husi Google Drive
+   Versão 1.3 – Otomatisasi Poligon GeoJSON (Kuning QGIS) & Foto Google Drive
    ================================================================ */
 
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTlZMbaAfDU2HN-CMLFAyDBzvP4wyVNOGj7c39AmE-wATKipXWqQDYu-PmtR7yb19nt_k_8aFQ-yw_6/pub?gid=580851566&single=true&output=csv';
@@ -221,10 +221,8 @@ function initMap() {
 
   osm.addTo(APP.map);
 
-  // Group layer Polygon
   APP.polygonGroup = L.featureGroup().addTo(APP.map);
 
-  // Group Marker Cluster
   APP.clusterGroup = L.markerClusterGroup({
     chunkedLoading: true,
     maxClusterRadius: 60,
@@ -232,7 +230,6 @@ function initMap() {
   });
   APP.map.addLayer(APP.clusterGroup);
 
-  // Control layer switch
   APP.layerControl = L.control.layers({
     'OpenStreetMap': osm,
     'Satellite':     satellite,
@@ -244,7 +241,7 @@ function initMap() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   GEOJSON LOADER DARI GOOGLE DRIVE DENGAN CORS PROXY
+   GEOJSON LOADER DARI GOOGLE DRIVE (OTOMATIS)
 ═══════════════════════════════════════════════════════════════ */
 async function fetchGeoJSONFromDrive(driveUrlOrId) {
   const fileId = extractDriveFileId(driveUrlOrId) || driveUrlOrId;
@@ -252,7 +249,6 @@ async function fetchGeoJSONFromDrive(driveUrlOrId) {
 
   const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
   
-  // Proxy CORS untuk membaca respons teks/JSON Google Drive di web publik
   const proxyEndpoints = [
     `https://corsproxy.io/?url=${encodeURIComponent(downloadUrl)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(downloadUrl)}`
@@ -265,7 +261,7 @@ async function fetchGeoJSONFromDrive(driveUrlOrId) {
         return await resp.json();
       }
     } catch (e) {
-      console.warn('Proxy gagal, mencoba fallback proxy...', e);
+      console.warn('Proxy gagal, mencoba opsi proxy cadangan...', e);
     }
   }
   return null;
@@ -275,19 +271,20 @@ function renderSingleGeoJSON(geojsonData, labelName = 'Parcela') {
   if (!geojsonData || !APP.polygonGroup) return null;
 
   const polyLayer = L.geoJSON(geojsonData, {
+    // Style persis seperti simbologi QGIS: Garis Kuning Emas (#ffc100), tengah transparan
     style: function () {
       return {
-        color: '#0284c7',       // Garis batas biru
-        weight: 2.5,
-        opacity: 0.9,
-        fillColor: '#38bdf8',   // Warna isi biru muda
-        fillOpacity: 0.35,
+        color: '#ffc100',
+        weight: 3,
+        opacity: 1.0,
+        fillColor: 'transparent',
+        fillOpacity: 0.0,
       };
     },
     onEachFeature: function (feature, l) {
       l.on({
         mouseover: function (e) {
-          e.target.setStyle({ weight: 4, fillOpacity: 0.55, color: '#f59e0b' });
+          e.target.setStyle({ weight: 4.5, color: '#ffffff' });
         },
         mouseout: function (e) {
           polyLayer.resetStyle(e.target);
@@ -296,8 +293,10 @@ function renderSingleGeoJSON(geojsonData, labelName = 'Parcela') {
 
       if (feature.properties) {
         const p = feature.properties;
-        let html = `<div style="font-size:12px; max-height:200px; overflow-y:auto;">`;
-        html += `<strong style="color:#0369a1; font-size:13px;"><i class="fa-solid fa-draw-polygon"></i> ${sanitize(labelName)}</strong><hr style="margin:4px 0; border:0; border-top:1px solid #cbd5e1;">`;
+        let html = `<div style="font-size:12px; max-height:220px; overflow-y:auto; min-width:160px;">`;
+        html += `<div style="font-weight:700; color:#d97706; font-size:13px; margin-bottom:4px;">
+                   <i class="fa-solid fa-draw-polygon"></i> ${sanitize(labelName)}
+                 </div><hr style="margin:4px 0; border:0; border-top:1px solid #e2e8f0;">`;
         for (const k in p) {
           if (p[k] !== undefined && p[k] !== null && p[k] !== '') {
             html += `<b>${sanitize(k)}:</b> ${sanitize(p[k])}<br/>`;
@@ -318,7 +317,6 @@ async function loadAllPolygons() {
   if (!APP.polygonGroup) return;
   APP.polygonGroup.clearLayers();
 
-  // Ambil semua data baris yang memiliki tautan di kolom GEOJSON_URL
   const rowsWithPoly = APP.allData.filter(d => d.polygon);
   const loadedIds = new Set();
 
@@ -333,7 +331,7 @@ async function loadAllPolygons() {
         renderSingleGeoJSON(geo, `Parcela UMA-${String(row.id).padStart(3,'0')}`);
       }
     } catch (err) {
-      console.warn(`Gagal memuat poligon ID ${row.id}:`, err);
+      console.warn(`Gagal memuat poligon untuk rumah ID ${row.id}:`, err);
     }
   }
 }
@@ -428,7 +426,6 @@ function processRawRows(rows) {
 
     const id = colId ? (row[colId] ?? (idx + 1)) : (idx + 1);
     
-    // Konversi foto dari Google Drive / Link Gambar
     let photoList = [];
     const rawPhotoVal = colPhoto ? String(row[colPhoto] || '').trim() : '';
 
