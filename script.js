@@ -8,7 +8,6 @@ const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT
 
 /* ─────────────────────────────────────────────────────────────────
    COLUMN MAPPING CONFIGURATION
-   Sesuaikan nama kolom Excel di sini jika struktur berbeda.
 ───────────────────────────────────────────────────────────────── */
 const COLUMN_MAP = {
   id:           ['id_uma', 'nu uma', 'id', 'house_id', 'no', 'nomor', 'no uma', 'id uma'],
@@ -21,11 +20,11 @@ const COLUMN_MAP = {
   status:       ['status', 'kondisi', 'kategori'],
   program:      ['programa', 'program', 'projetu'],
   year:         ['tinan', 'year', 'tahun', 'ano'],
-  photo:        ['foto', 'photo', 'image', 'gambar'],
+  photo:        ['foto', 'photo', 'image', 'gambar', 'link_foto', 'foto_drive'],
 };
 
 /* ─────────────────────────────────────────────────────────────────
-   IMAGE PATH CONFIGURATION
+   IMAGE PATH CONFIGURATION (Fallback Lokal)
 ───────────────────────────────────────────────────────────────── */
 const IMAGE_CONFIG = {
   folder: 'images',
@@ -105,6 +104,29 @@ function validateCoord(lat, lng) {
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return 'out_of_range';
   if (lat < -11 || lat > -7 || lng < 123 || lng > 128) return 'outside_tl';
   return 'ok';
+}
+
+/**
+ * Konversi link Google Drive (view, sharing, drive_link) menjadi Direct Image Link
+ */
+function formatGoogleDriveUrl(url) {
+  if (!url) return null;
+  const trimmed = String(url).trim();
+  
+  // Tangkap ID file dari semua jenis format URL Google Drive
+  const driveRegex = /(?:\/file\/d\/|[?&]id=)([a-zA-Z0-9_-]{25,})/;
+  const match = trimmed.match(driveRegex);
+  
+  if (match && match[1]) {
+    return `https://lh3.googleusercontent.com/d/${match[1]}=s800`;
+  }
+
+  // Jika URL gambar langsung (misal https://...jpg)
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  return null;
 }
 
 function getImagePath(id) {
@@ -267,16 +289,16 @@ function processRawRows(rows) {
   if (!rows || rows.length === 0) return [];
   const headers = Object.keys(rows[0]);
 
-  const colId   = detectCol(headers, 'id');
-  const colLat  = detectCol(headers, 'latitude');
-  const colLng  = detectCol(headers, 'longitude');
-  const colMun  = detectCol(headers, 'municipality');
-  const colPost = detectCol(headers, 'post');
-  const colSuco = detectCol(headers, 'suco');
-  const colAlde = detectCol(headers, 'aldeia');
-  const colStat = detectCol(headers, 'status');
-  const colProg = detectCol(headers, 'program');
-  const colYear = detectCol(headers, 'year');
+  const colId    = detectCol(headers, 'id');
+  const colLat   = detectCol(headers, 'latitude');
+  const colLng   = detectCol(headers, 'longitude');
+  const colMun   = detectCol(headers, 'municipality');
+  const colPost  = detectCol(headers, 'post');
+  const colSuco  = detectCol(headers, 'suco');
+  const colAlde  = detectCol(headers, 'aldeia');
+  const colStat  = detectCol(headers, 'status');
+  const colProg  = detectCol(headers, 'program');
+  const colYear  = detectCol(headers, 'year');
   const colPhoto = detectCol(headers, 'photo');
 
   if (!colLat || !colLng) {
@@ -303,10 +325,17 @@ function processRawRows(rows) {
 
     const id = colId ? (row[colId] ?? (idx + 1)) : (idx + 1);
     
-    let photoList;
-    if (colPhoto && row[colPhoto] && String(row[colPhoto]).trim() !== '') {
-      const customImg = String(row[colPhoto]).trim();
-      photoList = [`images/${customImg}`, customImg];
+    // Logika pemilihan foto: Google Drive / Link URL / File Lokal
+    let photoList = [];
+    const rawPhotoVal = colPhoto ? String(row[colPhoto] || '').trim() : '';
+
+    if (rawPhotoVal) {
+      const driveUrl = formatGoogleDriveUrl(rawPhotoVal);
+      if (driveUrl) {
+        photoList = [driveUrl];
+      } else {
+        photoList = [`images/${rawPhotoVal}`, rawPhotoVal];
+      }
     } else {
       photoList = getImagePath(id);
     }
@@ -401,8 +430,8 @@ function buildPopupHTML(house) {
   const imgPaths = house.imagePaths || [];
   const imgSrc = imgPaths.length ? escAttr(imgPaths[0]) : '';
   const imgHtml = imgSrc
-    ? `<img class="popup-photo" src="${imgSrc}" alt="Foto Uma ${escAttr(house.id)}" loading="lazy"
-         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"  />
+    ? `<img class="popup-photo" src="${imgSrc}" alt="Foto Uma ${escAttr(house.id)}" loading="lazy" referrerpolicy="no-referrer"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
        <div class="popup-photo-placeholder" style="display:none">
          <i class="fa-solid fa-image"></i><span>Foto la disponível</span>
        </div>`
@@ -640,7 +669,7 @@ function renderTable(data) {
       const imgPaths = house.imagePaths || [];
       const imgSrc = imgPaths.length ? escAttr(imgPaths[0]) : '';
       const thumb = imgSrc
-        ? `<img src="${imgSrc}" class="thumb-img" alt="foto" loading="lazy"
+        ? `<img src="${imgSrc}" class="thumb-img" alt="foto" loading="lazy" referrerpolicy="no-referrer"
              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
              onclick="goToMarker('${escAttr(house.id)}')" />
            <div class="thumb-placeholder" style="display:none"><i class="fa-solid fa-image"></i></div>`
@@ -712,7 +741,7 @@ function renderGaleria(data) {
     const imgSrc = imgPaths.length ? escAttr(imgPaths[0]) : '';
     const sid = escAttr(house.id);
     const imgHtml = imgSrc
-      ? `<img class="galeria-img" src="${imgSrc}" alt="Uma ${sanitize(house.id)}" loading="lazy"
+      ? `<img class="galeria-img" src="${imgSrc}" alt="Uma ${sanitize(house.id)}" loading="lazy" referrerpolicy="no-referrer"
            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
          <div class="galeria-img-placeholder" style="display:none"><i class="fa-solid fa-image"></i></div>`
       : `<div class="galeria-img-placeholder"><i class="fa-solid fa-image"></i></div>`;
@@ -739,7 +768,7 @@ window.openDetail = function(id) {
   const sid = escAttr(id);
 
   const photoHtml = mainSrc
-    ? `<img id="modal-main-photo" class="modal-photo" src="${mainSrc}" alt="Foto Uma"
+    ? `<img id="modal-main-photo" class="modal-photo" src="${mainSrc}" alt="Foto Uma" referrerpolicy="no-referrer"
          onerror="this.style.display='none';document.getElementById('modal-photo-placeholder').style.display='flex'" />
        <div id="modal-photo-placeholder" class="modal-photo-placeholder" style="display:none">
          <i class="fa-solid fa-image"></i><span>Foto la disponível</span>
